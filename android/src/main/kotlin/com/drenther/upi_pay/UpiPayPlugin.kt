@@ -1,5 +1,7 @@
 package com.drenther.upi_pay
 
+import androidx.annotation.NonNull
+
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.graphics.Bitmap
@@ -15,8 +17,10 @@ import io.flutter.plugin.common.MethodChannel.Result
 import io.flutter.plugin.common.PluginRegistry.ActivityResultListener
 import io.flutter.plugin.common.PluginRegistry.Registrar
 import java.io.ByteArrayOutputStream
+import io.flutter.embedding.engine.plugins.FlutterPlugin
 
-class UpiPayPlugin internal constructor(registrar: Registrar, channel: MethodChannel) : MethodCallHandler, ActivityResultListener {
+
+class UpiPayPlugin internal constructor(registrar: Registrar, channel: MethodChannel) : FlutterPlugin, MethodCallHandler, ActivityResultListener {
   private val activity = registrar.activity()
 
   private var result: Result? = null
@@ -74,13 +78,15 @@ class UpiPayPlugin internal constructor(registrar: Registrar, channel: MethodCha
 
       val intent = Intent(Intent.ACTION_VIEW, uri)
       intent.setPackage(app)
-
-      if (intent.resolveActivity(activity.packageManager) == null) {
-        this.success("activity_unavailable")
-        return
+      if (activity != null) {
+        if(activity?.packageManager != null) {
+          if (intent.resolveActivity(activity?.packageManager as PackageManager) == null) {
+            this.success("activity_unavailable")
+            return
+          }
+        }
+        activity?.startActivityForResult(intent, requestCodeNumber)
       }
-
-      activity.startActivityForResult(intent, requestCodeNumber)
     } catch (ex: Exception) {
       Log.e("upi_pay", ex.toString())
       this.success("failed_to_open_app")
@@ -94,31 +100,30 @@ class UpiPayPlugin internal constructor(registrar: Registrar, channel: MethodCha
     val uri = uriBuilder.build()
     val intent = Intent(Intent.ACTION_VIEW, uri)
 
-    val packageManager = activity.packageManager
+    val packageManager = activity?.packageManager
 
     try {
-      val activities = packageManager.queryIntentActivities(intent, PackageManager.MATCH_DEFAULT_ONLY)
+      val activities = packageManager?.queryIntentActivities(intent, PackageManager.MATCH_DEFAULT_ONLY)
 
       // Convert the activities into a response that can be transferred over the channel.
-      val activityResponse = activities.map {
+      val activityResponse = activities?.map {
         val packageName = it.activityInfo.packageName
-        val drawable = packageManager.getApplicationIcon(packageName)
-
-        val bitmap = getBitmapFromDrawable(drawable)
-        val icon = if (bitmap != null) {
-          encodeToBase64(bitmap)
-        } else {
-          null
+        val drawable = packageManager?.getApplicationIcon(packageName)
+        if(drawable != null) {
+          val bitmap = getBitmapFromDrawable(drawable)
+          val icon = if (bitmap != null) {
+            encodeToBase64(bitmap)
+          } else {
+            null
+          }
+          mapOf(
+            "packageName" to packageName,
+            "icon" to icon,
+            "priority" to it.priority,
+            "preferredOrder" to it.preferredOrder
+          )
         }
-
-        mapOf(
-                "packageName" to packageName,
-                "icon" to icon,
-                "priority" to it.priority,
-                "preferredOrder" to it.preferredOrder
-        )
       }
-
       result?.success(activityResponse)
     } catch (ex: Exception) {
       Log.e("upi_pay", ex.toString())
