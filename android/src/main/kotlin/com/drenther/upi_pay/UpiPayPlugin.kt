@@ -1,7 +1,5 @@
 package com.drenther.upi_pay
 
-import androidx.annotation.NonNull
-
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.graphics.Bitmap
@@ -17,16 +15,22 @@ import io.flutter.plugin.common.MethodChannel.Result
 import io.flutter.plugin.common.PluginRegistry.ActivityResultListener
 import io.flutter.plugin.common.PluginRegistry.Registrar
 import java.io.ByteArrayOutputStream
+import androidx.annotation.NonNull
 import io.flutter.embedding.engine.plugins.FlutterPlugin
 
-
-class UpiPayPlugin internal constructor(registrar: Registrar, channel: MethodChannel) : FlutterPlugin, MethodCallHandler, ActivityResultListener {
+class UpiPayPlugin internal constructor(registrar: Registrar, channel: MethodChannel): FlutterPlugin, MethodCallHandler {
+  private lateinit var channel : MethodChannel
   private val activity = registrar.activity()
 
   private var result: Result? = null
   private var requestCodeNumber = 201119
 
   var hasResponded = false
+
+  override fun onAttachedToEngine(flutterPluginBinding: FlutterPlugin.FlutterPluginBinding) {
+    channel = MethodChannel(flutterPluginBinding.binaryMessenger, "upi_pay")
+    channel.setMethodCallHandler(this)
+  }
 
   override fun onMethodCall(call: MethodCall, result: Result) {
     hasResponded = false
@@ -152,29 +156,8 @@ class UpiPayPlugin internal constructor(registrar: Registrar, channel: MethodCha
     }
   }
 
-  override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?): Boolean {
-    if (requestCodeNumber == requestCode && result != null) {
-      if (data != null) {
-        try {
-          val response = data.getStringExtra("response")!!
-          this.success(response)
-        } catch (ex: Exception) {
-          this.success("invalid_response")
-        }
-      } else {
-        this.success("user_cancelled")
-      }
-    }
-    return true
-  }
 
-  companion object {
-    @JvmStatic
-    fun registerWith(registrar: Registrar) {
-      val channel = MethodChannel(registrar.messenger(), "upi_pay")
-      val plugin = UpiPayPlugin(registrar, channel)
-      registrar.addActivityResultListener(plugin)
-      channel.setMethodCallHandler(plugin)
-    }
+  override fun onDetachedFromEngine(binding: FlutterPlugin.FlutterPluginBinding) {
+    channel.setMethodCallHandler(null)
   }
 }
