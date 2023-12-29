@@ -13,8 +13,10 @@ class UpiMethodChannel {
   Future<String?> initiateTransaction(
       TransactionDetails transactionDetails) async {
     if (io.Platform.isAndroid) {
-      return await _channel.invokeMethod<String>(
-          'initiateTransaction', transactionDetails.toJson());
+      return await _channel.invokeMethod<String>('initiateTransaction', {
+        "uri": transactionDetails.toString(),
+        "app": transactionDetails.upiApplication.toString()
+      });
     }
     throw UnsupportedError(
         'The `initiateTransaction` call is supported only on Android');

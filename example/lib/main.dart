@@ -70,7 +70,7 @@ class _ScreenState extends State<Screen> {
     final a = await UpiPay.initiateTransaction(
       amount: _amountController.text,
       app: app.upiApplication,
-      receiverName: 'Sharad',
+      receiverName: 'Laxhit',
       receiverUpiAddress: _upiAddressController.text,
       transactionRef: transactionRef,
       transactionNote: 'UPI Payment',

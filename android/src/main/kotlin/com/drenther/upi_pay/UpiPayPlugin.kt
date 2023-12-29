@@ -25,7 +25,10 @@ import io.flutter.plugin.common.PluginRegistry.ActivityResultListener
 class UpiPayPlugin: FlutterPlugin, ActivityAware, MethodCallHandler, ActivityResultListener {
   private lateinit var channel : MethodChannel
   private var activity: Activity? = null
+  private var result: Result? = null
   private var requestCodeNumber = 201119
+  var hasResponded = false
+  
 
   override fun onAttachedToEngine(flutterPluginBinding: FlutterPlugin.FlutterPluginBinding) {
     channel = MethodChannel(flutterPluginBinding.binaryMessenger, "upi_pay")
@@ -47,6 +50,8 @@ class UpiPayPlugin: FlutterPlugin, ActivityAware, MethodCallHandler, ActivityRes
   override fun onDetachedFromActivity() {}
 
   override fun onMethodCall(call: MethodCall, result: Result) {
+    hasResponded = false
+    this.result = result
     when (call.method) {
       "initiateTransaction" -> this.initiateTransaction(call, result)
       "getInstalledUpiApps" -> this.getInstalledUpiApps(call, result)
@@ -55,19 +60,23 @@ class UpiPayPlugin: FlutterPlugin, ActivityAware, MethodCallHandler, ActivityRes
   }
 
   override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?): Boolean {
-    if (requestCode == requestCodeNumber) {
-      if (resultCode == Activity.RESULT_OK) {
-        // Handle the success case if needed
-        // You can use data to retrieve any additional information from the result
-        // For example, data?.getStringExtra("keyName")
-        channel.invokeMethod("transactionSuccess", null)
+    if (requestCodeNumber == requestCode && result != null) {
+      if (data != null) {
+        try {
+          val response = data.getStringExtra("response")!!
+          this.success(response)
+          Log.e("upi_pay", response.toString())
+        } catch (ex: Exception) {
+          this.success("invalid_response")
+          Log.e("upi_pay", "invalid_response")
+          Log.e("upi_pay", ex.toString())
+        }
       } else {
-        // Handle the failure case if needed
-        channel.invokeMethod("transactionFailed", null)
+        this.success("user_cancelled")
+        Log.e("upi_pay", "user_cancelled")
       }
-      return true
     }
-    return false
+    return true
   }
 
 
@@ -76,41 +85,11 @@ class UpiPayPlugin: FlutterPlugin, ActivityAware, MethodCallHandler, ActivityRes
   }
 
   private fun initiateTransaction(call: MethodCall, result: Result) {
+    val complete_uri: String? = call.argument("uri")
     val app: String? = call.argument("app")
-    val pa: String? = call.argument("pa")
-    val pn: String? = call.argument("pn")
-    val mc: String? = call.argument("mc")
-    val tr: String? = call.argument("tr")
-    val tn: String? = call.argument("tn")
-    val am: String? = call.argument("am")
-    val cu: String? = call.argument("cu")
-    val url: String? = call.argument("url")
-
     try {
-      /*
-       * Some UPI apps extract incorrect format VPA due to url encoding of `pa` parameter.
-       * For example, the VPA 'abc@upi' gets url encoded as 'abc%40upi' and is extracted as
-       * 'abc 40upi' by these apps. The URI building logic is changed to avoid URL encoding
-       * of the value of 'pa' parameter. - Reetesh
-      */
-      var uriStr: String? = "upi://pay?pa=" + pa +
-              "&pn=" + Uri.encode(pn) +
-              "&tr=" + Uri.encode(tr) +
-              "&am=" + Uri.encode(am) +
-              "&cu=" + Uri.encode(cu)
-      if(url != null) {
-        uriStr += ("&url=" + Uri.encode(url))
-      }
-      if(mc != null) {
-        uriStr += ("&mc=" + Uri.encode(mc))
-      }
-      if(tn != null) {
-        uriStr += ("&tn=" + Uri.encode(tn))
-      }
-      uriStr += "&mode=00" // &orgid=000000"
-      val uri = Uri.parse(uriStr)
-      // Log.d("upi_pay", "initiateTransaction URI: " + uri.toString())
-
+      Log.e("upi_pay, uri", complete_uri.toString())
+      val uri = Uri.parse(complete_uri)
       val intent = Intent(Intent.ACTION_VIEW, uri)
       intent.setPackage(app)
       if (activity != null) {
@@ -131,15 +110,11 @@ class UpiPayPlugin: FlutterPlugin, ActivityAware, MethodCallHandler, ActivityRes
   private fun getInstalledUpiApps(call: MethodCall, result: Result) {
     val uriBuilder = Uri.Builder()
     uriBuilder.scheme("upi").authority("pay")
-
     val uri = uriBuilder.build()
     val intent = Intent(Intent.ACTION_VIEW, uri)
-
     val packageManager = activity?.packageManager
-
     try {
       val activities = packageManager?.queryIntentActivities(intent, PackageManager.MATCH_DEFAULT_ONLY)
-
       // Handle null elements in the list
       val activityResponse = activities?.mapNotNull {
         val packageName = it.activityInfo.packageName
@@ -161,7 +136,6 @@ class UpiPayPlugin: FlutterPlugin, ActivityAware, MethodCallHandler, ActivityRes
           null
         }
       }
-
       // Ensure that activityResponse is non-null before passing it to result.success
       if (activityResponse != null) {
         result.success(activityResponse)
@@ -187,5 +161,12 @@ class UpiPayPlugin: FlutterPlugin, ActivityAware, MethodCallHandler, ActivityRes
     drawable.setBounds(0, 0, canvas.getWidth(), canvas.getHeight())
     drawable.draw(canvas)
     return bmp
+  }
+
+  private fun success(o: String) {
+    if (!hasResponded) {
+      hasResponded = true
+      result?.success(o)
+    }
   }
 }
