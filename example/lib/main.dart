@@ -38,9 +38,6 @@ class _ScreenState extends State<Screen> {
   void initState() {
     super.initState();
 
-    _amountController.text =
-        (Random.secure().nextDouble() * 10).toStringAsFixed(2);
-
     Future.delayed(Duration(milliseconds: 0), () async {
       _apps = await UpiPay.getInstalledUpiApplications(
           statusType: UpiApplicationDiscoveryAppStatusType.all);
@@ -53,13 +50,6 @@ class _ScreenState extends State<Screen> {
     _amountController.dispose();
     _upiAddressController.dispose();
     super.dispose();
-  }
-
-  void _generateAmount() {
-    setState(() {
-      _amountController.text =
-          (Random.secure().nextDouble() * 10).toStringAsFixed(2);
-    });
   }
 
   Future<void> _onTap(ApplicationMeta app) async {
@@ -158,19 +148,10 @@ class _ScreenState extends State<Screen> {
           Expanded(
             child: TextField(
               controller: _amountController,
-              readOnly: true,
-              enabled: false,
               decoration: InputDecoration(
                 border: OutlineInputBorder(),
                 labelText: 'Amount',
               ),
-            ),
-          ),
-          Container(
-            margin: EdgeInsets.only(left: 8),
-            child: IconButton(
-              icon: Icon(Icons.loop),
-              onPressed: _generateAmount,
             ),
           ),
         ],
